@@ -1,0 +1,9 @@
+############################################
+# Cache Static Files
+############################################
+# This include contains a location block used to assign Expires and Cache-Control headers to static files
+
+location ~* ^.+\.(jpg|jpeg|gif|css|png|js|ico|xml|htm|swf|cur)$ {
+    access_log off;
+    expires    2w;
+}

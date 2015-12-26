@@ -1,0 +1,14 @@
+############################################
+# Stub Status
+############################################
+# This file contains a location block used for displaying basic information about the web server.
+# This includes the number of currently active connections, the total number of connections made since the web server
+# was started, and other various connection related details.
+#
+# For more information, refer to the Nginx module documentation
+# http://nginx.org/en/docs/http/ngx_http_stub_status_module.html
+
+location = /ngx_server_status {
+    stub_status on;
+    include /etc/nginx/includes/allow_only_admins;
+}

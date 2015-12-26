@@ -1,0 +1,79 @@
+#!/bin/bash
+
+set -e;
+
+readonly NGINX_BASEDIR="/etc/nginx";
+readonly HTTP_BASEDIR="/srv/http";
+readonly DEFAULT_NGINX_USER="nginx";
+readonly DEFAULT_FPM_USER="www-data";
+
+readonly BOLD=$(tput bold)
+readonly NORMAL=$(tput sgr0)
+
+# Set arguments
+DOMAIN=$1;
+SECTION=$2;
+
+if [ $# -ne 2 ]; then
+	echo "Please provide the domain and section of the server you wish to fix permissions for";
+	echo "(Example: /etc/nginx/scripts/fixperms example.org root)";
+	exit 1;
+fi
+
+# Check config paths
+CONFIG_BASEDIR="${NGINX_BASEDIR}/sites-available/${DOMAIN}";
+CONFIG_FILEPATH="${CONFIG_BASEDIR}/${SECTION}.conf";
+
+if [ ! -d "${CONFIG_BASEDIR}" ]; then
+	echo "Creating new virtual host directory: ${BOLD}${CONFIG_BASEDIR}${NORMAL}";
+	mkdir "${CONFIG_BASEDIR}";
+fi
+chown "root:${NGINX_USER}" "${CONFIG_BASEDIR}" && chmod 0755 "${CONFIG_BASEDIR}";
+
+if [ -e "${CONFIG_FILEPATH}" ]; then
+	echo -e "\e[93mVirtual host already exists: ${BOLD}${CONFIG_FILEPATH}${NORMAL}\e[0m";
+else
+	touch "${CONFIG_FILEPATH}";
+fi
+chown "root:${NGINX_USER}" "${CONFIG_FILEPATH}" && chmod 0644 "${CONFIG_FILEPATH}";
+
+# Check app paths
+DOMAIN_BASEDIR="${HTTP_BASEDIR}/${DOMAIN}";
+APP_BASEDIR="${DOMAIN_BASEDIR}/${SECTION}";
+if [ ! -d "${DOMAIN_BASEDIR}" ]; then
+	echo "Creating new domain directory: ${BOLD}${DOMAIN_BASEDIR}${NORMAL}";
+	mkdir "${DOMAIN_BASEDIR}";
+fi
+
+if [ -e "${APP_BASEDIR}" ]; then
+	echo -e "\e[93mVirtual host root directory already exists: ${BOLD}${APP_BASEDIR}${NORMAL}\e[0m";
+	echo -e "\e[91mUnable to continue\e[0m";
+	exit 1;
+fi
+mkdir "${APP_BASEDIR}";
+
+# Logging
+LOGS_PATH="${APP_BASEDIR}/logs";
+mkdir "${LOGS_PATH}";
+echo "Log directory created: ${LOGS_PATH}";
+
+touch "${LOGS_PATH}/access.log.gz" "${LOGS_PATH}/error.log" "${LOGS_PATH}/php_error.log" "${LOGS_PATH}/php_slow.log";
+echo "Default logfiles generated";
+
+# Web paths
+PRIVATE_PATH="${APP_BASEDIR}/internal";
+mkdir "${PRIVATE_PATH}";
+echo "Private web data path created: ${BOLD}${PRIVATE_PATH}${NORMAL}";
+
+PUBLIC_PATH="${APP_BASEDIR}/html";
+mkdir "${PUBLIC_PATH}";
+echo "Public web data path created: ${BOLD}${PUBLIC_PATH}${NORMAL}";
+
+echo;
+echo "------------------------------";
+echo -e "Virtual host configuration: \e[94m${BOLD}${CONFIG_FILEPATH}${NORMAL}\e[0m";
+echo;
+echo -e "Application logs: \e[94m${BOLD}${LOGS_PATH}${NORMAL}\e[0m";
+echo -e "Application internal: \e[94m${BOLD}${PRIVATE_PATH}${NORMAL}\e[0m";
+echo -e "Application HTML: \e[94m${BOLD}${PUBLIC_PATH}${NORMAL}\e[0m";
+echo;

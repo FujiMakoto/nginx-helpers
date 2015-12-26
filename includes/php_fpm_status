@@ -1,0 +1,18 @@
+############################################
+# PHP FPM Status
+############################################
+# This file contains a location block used for enabling admin only access to the php_fpm_status URI.
+# The PHP-FPM status page contains a lot of useful profiling information for PHP applications, but it can contain
+# sensitive data that should not be publicly accessible as well.
+#
+# Note: This location block assumes you have a php_backend upstream block defined for handling PHP-FPM requests.
+#
+# For more information, refer to the following article (since there's seemingly no official documentation)
+# https://easyengine.io/tutorials/php/fpm-status-page/
+
+location ^~ /php_fpm_status {
+    include /etc/nginx/includes/allow_only_admins;
+
+    include         /etc/nginx/includes/fastcgi_params;
+    fastcgi_pass    php_backend;
+}

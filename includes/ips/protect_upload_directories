@@ -1,0 +1,16 @@
+############################################
+# Protect Upload Directories
+############################################
+# These directives are used to prevent execution of PHP scripts in writable upload directories.
+
+location ~ ^/uploads/.*\.(?:php\d*|phtml)$ {
+    deny    all;
+}
+
+location ~ ^/datastore/.*\.(?:php\d*|phtml)$ {
+    deny    all;
+}
+
+location ~ ^/uploads/.*\.(?:php\d*|phtml)$ {
+    deny    all;
+}

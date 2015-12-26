@@ -1,0 +1,33 @@
+#!/bin/bash
+
+readonly NGINX_BASEDIR="/etc/nginx";
+
+# Set arguments
+DOMAIN=$1;
+SECTION=$2;
+
+if [ $# -ne 2 ]; then
+	echo "Please provide the domain and section of the server you wish to enable";
+	echo "(Example: /etc/nginx/scripts/enable example.org root)";
+	exit 1;
+fi
+
+# Check paths
+CFG_DIR="${NGINX_BASEDIR}/sites-available/${DOMAIN}";
+if [ ! -d $CFG_DIR ]; then
+	echo "Domain does not exist: ${DOMAIN}";
+	exit 1;
+fi
+
+CFG_PATH="${CFG_DIR}/${SECTION}.conf";
+if [ ! -f $CFG_PATH ]; then
+	echo "Section '${SECTION}' does not exist for ${DOMAIN}";
+	exit 1;
+fi
+
+# Process
+if [ $SECTION = 'root' ]; then
+	ln -vs "$CFG_PATH" "${NGINX_BASEDIR}/sites-enabled/${DOMAIN}";
+else
+	ln -vs "$CFG_PATH" "${NGINX_BASEDIR}/sites-enabled/${SECTION}.${DOMAIN}";
+fi

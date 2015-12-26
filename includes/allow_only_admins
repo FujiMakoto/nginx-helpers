@@ -1,0 +1,18 @@
+############################################
+# Allow Only Admins
+############################################
+# This file is included in location blocks which only administrators should be allowed to acccess.
+#
+# There are two primary ways to restrict access (which are explained in more detail below). These methods can be
+# used in combination with each other, restricting access by IP first then requiring HTTP authentication.
+# This is mostly only useful when you need to allow access to large subnets or public networks.
+
+# IP address whitelist
+# http://nginx.org/en/docs/http/ngx_http_access_module.html
+allow 127.0.0.1;
+deny all;
+
+# HTTP Authenitcation
+# https://www.digitalocean.com/community/tutorials/how-to-set-up-http-authentication-with-nginx-on-ubuntu-12-10
+#auth_basic    	        "Access to this page is restricted to administrators";
+#auth_basic_user_file   /etc/nginx/includes/.htpasswd;

@@ -1,0 +1,27 @@
+#!/bin/bash
+
+readonly NGINX_BASEDIR="/etc/nginx";
+
+# Set arguments
+DOMAIN=$1;
+SECTION=$2;
+
+if [ $# -eq 0 ]; then
+	echo "Please provide at least the domain of the server you wish to disable";
+	echo "(Example: /etc/nginx/scripts/disable example.org subdomain)";
+	exit 1;
+fi
+
+# Disable all under a domain?
+if [ $# -eq 1 ]; then
+	rm -fv "${NGINX_BASEDIR}/sites-enabled/*${DOMAIN}";
+	rm -fv "${NGINX_BASEDIR}/sites-enabled/${DOMAIN}";
+	exit 0;
+fi
+
+# Disable a single domain section
+if [ $SECTION = 'root' ]; then
+	rm -v "${NGINX_BASEDIR}/sites-enabled/${DOMAIN}";
+else
+	rm -v "${NGINX_BASEDIR}/sites-enabled/${SECTION}.${DOMAIN}";
+fi

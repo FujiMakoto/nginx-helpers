@@ -1,0 +1,162 @@
+#!/bin/bash
+
+readonly HTTP_BASEDIR="/srv/http";
+readonly DEFAULT_NGINX_USER="nginx";
+readonly DEFAULT_FPM_USER="www-data";
+readonly DEFAULT_WEBAPP_USER="webapp";
+
+readonly BOLD=$(tput bold);
+readonly NORMAL=$(tput sgr0);
+
+set -e;
+#set -x;
+
+# Set arguments
+DOMAIN=$1;
+SECTION=$2;
+
+if [ $# -ne 2 ]; then
+	echo "Please provide the domain and section of the server you wish to fix permissions for";
+	echo "(Example: /etc/nginx/scripts/fixperms example.org root)";
+	exit 1;
+fi
+
+# Check paths
+DOMAIN_BASEDIR="${HTTP_BASEDIR}/${DOMAIN}";
+APP_BASEDIR="${DOMAIN_BASEDIR}/${SECTION}";
+if [ ! -d $APP_BASEDIR ]; then
+	echo "Path does not exist: ${APP_BASEDIR}";
+	exit 1;
+fi
+
+# Prompt for users and offer to create them now if they don't exist
+while true
+do
+
+	read -e -p "${BOLD}What user do you want to grant file ownership to?${NORMAL} " -i "${DEFAULT_WEBAPP_USER}" WEBAPP_USER;
+
+	# Make sure the user exists
+	if ! ( id -u "${WEBAPP_USER}" &>/dev/null ); then
+		read -p "User ${BOLD}${WEBAPP_USER}${NORMAL} does not exist. Create now? [y/N] " -n 1 -r;
+		echo;
+
+		if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+			continue;
+		fi
+
+		if ! ( useradd --system --shell=/bin/false "${WEBAPP_USER}" ); then
+			echo -e "\e[91mFailed to create user ${BOLD}${WEBAPP_USER}${NORMAL}\e[0m";
+			exit 1;
+		fi
+	fi
+
+	break;
+
+done
+
+while true
+do
+
+	read -e -p "${BOLD}What user does PHP-FPM run under for this virtual host?${NORMAL} " -i "${DEFAULT_FPM_USER}" FPM_USER;
+
+	# Make sure the user exists
+	if ! ( id -u "${FPM_USER}" &>/dev/null ); then
+		read -p "User ${BOLD}${FPM_USER}${NORMAL} does not exist. Create now? [y/N] " -n 1 -r;
+		echo;
+
+		if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+			continue;
+		fi
+
+		if ! ( useradd --system --shell=/bin/false "${FPM_USER}" ); then
+			echo -e "\e[91mFailed to create user ${BOLD}${FPM_USER}${NORMAL}\e[0m";
+			exit 1;
+		fi
+
+		if ! ( gpasswd -a "${DEFAULT_NGINX_USER}" "${FPM_USER}" ); then
+			echo -e "\e[91mFailed to add PHP-FPM group ${BOLD}${FPM_USER}${NORMAL} to Nginx user ${BOLD}${DEFAULT_NGINX_USER}${NORMAL}\e[0m";
+			exit 1;
+		fi
+	fi
+
+	break;
+
+done
+
+read -e -p "${BOLD}Which individual files/directories should PHP be granted write access to?${NORMAL} " -a WRITABLE_SINGLES;
+read -e -p "${BOLD}Which directories should PHP be granted recursive write access to?${NORMAL} " -a WRITABLE_RECURSIVES;
+
+# If ACL permissions have already been set, prompt the user to reset before continuing
+APP_BASEDIR_MODE=($(ls -ld "${APP_BASEDIR}"));
+if [ "${APP_BASEDIR_MODE[0]: -1}" = 'x' ]; then
+	read -p "This application directory appears to already have ACL permissions applied.
+	Would you like to reset these permissions before continuing? [y/N] " -n 1 -r;
+	echo;
+fi
+
+echo;
+# Unix permissions
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+	setfacl -R -b "${APP_BASEDIR}";
+	setfacl -R -d -b "${APP_BASEDIR}";
+	echo "Existing ACL permissions reset"
+fi
+echo "Making sure all files and directories are owned by ${BOLD}${USER_GROUP}${NORMAL}";
+chown -R "${USER_GROUP}" "${APP_BASEDIR}";
+echo "Setting directory permissions to ${BOLD}0750${NORMAL}";
+find "${APP_BASEDIR}" -type d -exec chmod 0750 "{}" \;
+echo "Setting file permissions to ${BOLD}0640${NORMAL}";
+find "${APP_BASEDIR}" -type f -exec chmod 0640 "{}" \;
+
+# ACL permissions
+echo "Setting default permissions for new files";
+setfacl -R -d -m "u::rwx" -m "g::r-x" -m "o::-" "${APP_BASEDIR}"
+
+## Nginx
+echo "Granting Nginx user read-only access to all files and directories";
+setfacl -R -m "u:${DEFAULT_NGINX_USER}:r-x" "${APP_BASEDIR}";
+setfacl -R -d -m "u:${DEFAULT_NGINX_USER}:r-x" "${APP_BASEDIR}";
+
+## PHP-FPM
+echo "Granting PHP-FPM user read-only access to all files and directories";
+setfacl -R -m "u:${FPM_USER}:r-x" "${APP_BASEDIR}";
+setfacl -R -d -m "u:${FPM_USER}:r-x" "${APP_BASEDIR}";
+
+for spath in "${WRITABLE_SINGLES[@]}"
+do
+	:
+	echo "Granting PHP-FPM user write access to ${BOLD}${spath}${NORMAL}";
+	setfacl -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/public/${fpath}";
+	if [ -d "${spath}" ]; then
+		setfacl -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/public/${fpath}";
+	fi
+done
+
+for rpath in "${WRITABLE_RECURSIVES[@]}"
+do
+	:
+	echo "Granting PHP-FPM user recursive write access in ${BOLD}${dpath}${NORMAL}";
+	setfacl -R -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/public/${dpath}";
+	setfacl -R -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/public/${dpath}";
+done
+
+# Logfiles
+echo "Adjusting Nginx logfile permissions";
+NGINX_LOGFILES=( "access.log.gz" "error.log" );
+for nlp in "${NGINX_LOGFILES[@]}"
+do
+	:
+	setfacl -m "u:${DEFAULT_NGINX_USER}:rwx" "${APP_BASEDIR}/logs/${nlp}";
+done
+
+echo "Adjusting PHP-FPM logfile permissions";
+PHP_LOGFILES=( "php_error.log" "php_slow.log" );
+for plp in "${PHP_LOGFILES[@]}"
+do
+	:
+	setfacl -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/logs/${plp}";
+done
+
+
+echo;
+echo "All site permissions updated successfully";

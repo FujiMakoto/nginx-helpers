@@ -1,0 +1,8 @@
+############################################
+# Deny Dotfiles
+############################################
+# This include contains a location block used to deny access to "dotfiles" on the filesystem.
+
+location ~ /\. {
+    deny  all;
+}

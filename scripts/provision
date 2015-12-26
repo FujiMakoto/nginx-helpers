@@ -1,0 +1,260 @@
+#!/bin/bash
+
+# Uncomment to enable debug mode
+#set -x;
+set -u;
+
+# Resource URL's
+readonly RES_URL_VIM_SYNTAX="http://resources.makoto.io/nginx/nginx.vim";
+readonly RES_URL_INCLUDES="http://resources.makoto.io/nginx/includes.tar.gz";
+readonly RES_URL_INCLUDES_SIG="${RES_URL_INCLUDES}.asc"
+
+readonly NGINX_BASEDIR="/etc/nginx";
+readonly NGINX_USER="nginx";
+readonly WWW_DATA_USER="www-data"
+
+readonly BOLD=$(tput bold);
+readonly NORMAL=$(tput sgr0);
+
+# Make sure we're root
+if ! [ $(id -u) = 0 ]; then
+	echo "This script requires root permissions to run";
+	exit 126;
+fi
+
+# Make sure Nginx has been installed
+NGINX_INSTALLED=$(type nginx >/dev/null && echo 1 || echo 0);
+if [ $NGINX_INSTALLED -lt 1 ] || [ ! -w $NGINX_BASEDIR ]; then
+	echo -e "\e[91mERROR: No Nginx installation present, please install Nginx before running this script\e[0m";
+fi
+
+# Make sure the Nginx user exists
+if ! ( id -u "${NGINX_USER}" &>/dev/null ); then
+	read -p "User ${BOLD}${NGINX_USER}${NORMAL} does not exist. Create now? [y/N] " -n 1 -r;
+	echo;
+
+	if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+		echo -e "\e[93mA dedicated Nginx user is required to run the provisioner. Unable to continue.\e[0m";
+		exit 1;
+	fi
+
+	if ! ( useradd --system --shell=/bin/false "${NGINX_USER}" ); then
+		echo -e "\e[93mFailed to create Nginx user ${BOLD}${NGINX_USER}${NORMAL}\e[0m";
+		exit 1;
+	fi
+fi
+
+# Make sure the www-data/PHP-FPM user exists (We need to make sure it exists now so we can set permissions prior to installing PHP-FPM)
+if ! ( id -u "${WWW_DATA_USER}" &>/dev/null ); then
+	read -p "User ${BOLD}${WWW_DATA_USER}${NORMAL} does not exist. Create now? [y/N] " -n 1 -r;
+	echo;
+
+	if [[ $REPLY =~ ^[Yy]$ ]]; then
+		if ! ( useradd --system --shell=/bin/false "${WWW_DATA_USER}" ); then
+			echo -e "\e[93mFailed to create user ${BOLD}${WWW_DATA_USER}${NORMAL}\e[0m";
+		fi
+	fi
+fi
+
+
+# Clean up on exit
+readonly TMPDIR=$(su -s /bin/sh -c "mktemp -d" ${NGINX_USER});
+
+#######################################
+# Clean up temporary data on exit
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   None
+#######################################
+cleanup()
+{
+	echo "Cleaning up...";
+	su -s /bin/sh -c "rm -rf ${TMPDIR}" $NGINX_USER;
+	exit $?;
+}
+
+trap cleanup EXIT SIGTERM SIGINT
+
+# Safety prompt
+echo;
+read -t 90 -p "You are about to provision ${BOLD}${NGINX_BASEDIR}${NORMAL}.
+This should only be run on fresh installations unless you really know what you're doing.
+Are you sure you want to continue? [y/N] " -n 1 -r;
+echo;
+
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+	echo -e "\e[91mAborting\e[0m";
+	echo;
+	exit 1;
+fi
+echo;
+
+
+#######################################
+# Download and install vim syntax highlighting
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   None
+#######################################
+install_vim_syntax()
+{
+	local VIM_FILETYPE_PATH="${HOME}/.vim/filetype.vim";
+	if [ -w "/usr/share/vim/vim74/filetype.vim" ]; then
+		VIM_FILETYPE_PATH="/usr/share/vim/vim74/filetype.vim";
+	elif [ -w "/usr/share/vim/vim73/filetype.vim" ]; then
+		VIM_FILETYPE_PATH="/usr/share/vim/vim73/filetype.vim";
+	fi
+
+	# Download the syntax configuration
+	if ! ( su -s /bin/sh -c "wget -qO \"${TMPDIR}/nginx.vim\" $RES_URL_VIM_SYNTAX" $NGINX_USER ); then
+		echo -e "\e[91mERROR: Unable to download vim configuration file\e[0m";
+		return 1;
+	fi
+
+	mv -v "${TMPDIR}/nginx.vim" "${VIM_SYNTAX_PATH}/syntax/nginx.vim";
+	echo "au BufRead,BufNewFile /etc/nginx/*,/usr/local/nginx/conf/* if &ft == '' | setfiletype nginx | endif" >> $VIM_FILETYPE_PATH;
+}
+
+#######################################
+# Download and install Nginx include templates
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   None
+#######################################
+install_includes()
+{
+	# Download the includes package
+	if ! ( su -s /bin/sh -c "wget -qO \"${TMPDIR}/includes.tar.gz\" $RES_URL_INCLUDES" $NGINX_USER ); then
+		echo -e "\e[91mERROR: Unable to download Nginx include templates\e[0m";
+		return 1;
+	fi
+	if ! ( su -s /bin/sh -c "wget -qO \"${TMPDIR}/includes.tar.gz.asc\" $RES_URL_INCLUDES_SIG" $NGINX_USER ); then
+		echo -e "\e[91mERROR: Unable to download Nginx include templates\e[0m";
+		return 1;
+	fi
+
+	# Authenticate the signature
+	gpg --list-keys E89C672A || gpg --keyserver keys.gnupg.net --recv-keys E89C672A
+	if ! ( gpg --verify "${TMPDIR}/includes.tar.gz.asc" "${TMPDIR}/includes.tar.gz" ); then
+		echo -e "\e[91mERROR: Unable to verify the authenticity of the downloaded includes package, refusing to install\e[0m";
+		return 1;
+	fi
+
+	tar -xzvf "${TMPDIR}/includes.tar.gz" -C $NGINX_BASEDIR;
+}
+
+
+# Remove unnecessary CentOS files and directories
+if [ -d "${NGINX_BASEDIR}/default.d/" ]; 
+	then rmdir -v "/etc/nginx/default.d/"; 
+fi
+
+# Move our includes
+if [ ! -d "${NGINX_BASEDIR}/includes" ]; then
+	mkdir -v "${NGINX_BASEDIR}/includes";
+fi
+
+includes=(
+	'fastcgi_params' 'scgi_params' 'uwsgi_params' 'win-utf' 'koi-utf' 'koi-win' 'naxsi.rules'
+	'naxsi_core.rules' 'naxsi-ui.conf.*' 'proxy_params'
+)
+
+for i in "${includes[@]}"
+do
+	:
+	if [ -e "${NGINX_BASEDIR}/${i}" ]; then
+		mv -v "${NGINX_BASEDIR}/${i}" "${NGINX_BASEDIR}/includes/${i}";
+	fi
+done
+
+install_includes
+
+if [ -e "${NGINX_BASEDIR}/mime.types" ]; then
+	mv -v "${NGINX_BASEDIR}/mime.types" "${NGINX_BASEDIR}/conf.d/mime_types.conf";
+fi
+
+# Server containers
+if [ ! -d "${NGINX_BASEDIR}/sites-available" ]; then
+	mkdir -v "${NGINX_BASEDIR}/sites-available";
+elif [ -f "${NGINX_BASEDIR}/sites-available/default" ]; then
+	mv "${NGINX_BASEDIR}/sites-available/default" "${NGINX_BASEDIR}/conf.d/default.conf";
+fi
+
+if [ ! -d "${NGINX_BASEDIR}/sites-enabled" ]; then
+	mkdir -v "${NGINX_BASEDIR}/sites-enabled";
+elif [ -h "${NGINX_BASEDIR}/sites-enabled/default" ]; then
+	rm -f "${NGINX_BASEDIR}/sites-enabled/default";
+fi
+
+# Default servers
+if [ ! -d "${NGINX_BASEDIR}/sites-available/default" ]; then
+	mkdir -v "${NGINX_BASEDIR}/sites-available/default";
+fi
+
+if [ -f "${NGINX_BASEDIR}/conf.d/default.conf" ]; then
+	mv -v "${NGINX_BASEDIR}/conf.d/default.conf" "${NGINX_BASEDIR}/sites-available/default/root.conf";
+	ln -vs "${NGINX_BASEDIR}/sites-available/default/root.conf" "${NGINX_BASEDIR}/sites-enabled/default";
+elif [ -f "${NGINX_BASEDIR}/sites-available/default.conf" ]; then
+	mv -v "${NGINX_BASEDIR}/sites-available/default.conf" "${NGINX_BASEDIR}/sites-available/default/root.conf";
+	rm -f "${NGINX_BASEDIR}/sites-enabled/default.conf";
+	ln -vs "${NGINX_BASEDIR}/sites-available/default/root.conf" "${NGINX_BASEDIR}/sites-enabled/default";
+fi
+
+if [ -f "${NGINX_BASEDIR}/conf.d/example_ssl.conf" ]; then
+	rm -v "${NGINX_BASEDIR}/conf.d/example_ssl.conf";
+fi
+
+# SSL container
+if [ ! -d "${NGINX_BASEDIR}/ssl" ]; then
+	mkdir -v "${NGINX_BASEDIR}/ssl";
+	chmod 0750 "${NGINX_BASEDIR}/ssl";
+fi
+
+# Update permissions
+chown -vR "root:${NGINX_USER}" "${NGINX_BASEDIR}";
+find "${NGINX_BASEDIR}" -type d -exec chmod -v 0755 "{}" \;
+find "${NGINX_BASEDIR}" -not -path "${NGINX_BASEDIR}/ssl/*" -type f -exec chmod -v 0644 "{}" \;
+find "${NGINX_BASEDIR}/scripts" -type f -exec chmod +x "{}" \;
+
+# Make sure SSL keys are not given public read access
+find "${NGINX_BASEDIR}/ssl/" -type f -iname "*.key" -exec chmod -v 0640 {} \;
+
+# If we have vim available, let's set up some files for syntax highlighting Nginx configuration files
+VIM_INSTALLED=$(type vim >/dev/null && echo 1 || echo 0);
+if [ $VIM_INSTALLED -eq 1 ]; then
+	VIM_SYNTAX_PATH="${HOME}/.vim";
+	if [ -w "/usr/share/vim/vim74/syntax/" ]; then
+		VIM_SYNTAX_PATH="/usr/share/vim/vim74";
+	elif [ -w "/usr/share/vim/vim73/syntax/" ]; then
+		VIM_SYNTAX_PATH="/usr/share/vim/vim73";
+	else
+		# Create our vim user configuration directory if it doesn't already exist
+		if [ ! -d $VIM_SYNTAX_PATH ] && [ -d $HOME ]; then  # Second if in case a user has no home directory, so we don't try and write to /.vim
+			mkdir -pv "${VIM_SYNTAX_PATH}/syntax";
+		fi
+	fi
+
+	if [ -d $VIM_SYNTAX_PATH ] && [ ! -f "${VIM_SYNTAX_PATH}/syntax/nginx.vim" ]; then
+		read -p "Would you like to download and install Nginx syntax highlighting for vim? [y/N] " -n 1 -r;
+		echo;
+		
+		if [[ $REPLY =~ ^[Yy]$ ]]; then
+			if ! ( install_vim_syntax "$VIM_SYNTAX_PATH" ); then
+				echo -e "\e[91mERROR: vim syntax installation failed\e[0m";
+			fi
+		fi
+	fi
+fi
+
+echo;
+echo "Nginx has been successfully provisioned!"
+exit 0;

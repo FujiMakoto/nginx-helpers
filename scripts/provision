@@ -105,10 +105,8 @@ echo;
 install_vim_syntax()
 {
 	local VIM_FILETYPE_PATH="${HOME}/.vim/filetype.vim";
-	if [ -w "/usr/share/vim/vim74/filetype.vim" ]; then
-		VIM_FILETYPE_PATH="/usr/share/vim/vim74/filetype.vim";
-	elif [ -w "/usr/share/vim/vim73/filetype.vim" ]; then
-		VIM_FILETYPE_PATH="/usr/share/vim/vim73/filetype.vim";
+	if [ -w "/etc/vim/vimrc" ]; then
+		VIM_FILETYPE_PATH="/etc/vim/vimrc";
 	fi
 
 	# Download the syntax configuration
@@ -232,10 +230,9 @@ find "${NGINX_BASEDIR}/ssl/" -type f -iname "*.key" -exec chmod -v 0640 {} \;
 VIM_INSTALLED=$(type vim >/dev/null && echo 1 || echo 0);
 if [ $VIM_INSTALLED -eq 1 ]; then
 	VIM_SYNTAX_PATH="${HOME}/.vim";
-	if [ -w "/usr/share/vim/vim74/syntax/" ]; then
-		VIM_SYNTAX_PATH="/usr/share/vim/vim74";
-	elif [ -w "/usr/share/vim/vim73/syntax/" ]; then
-		VIM_SYNTAX_PATH="/usr/share/vim/vim73";
+	if [ -w "/etc/vim" ]; then
+		VIM_SYNTAX_PATH="/etc/vim";
+		mkdir -p /etc/vim/syntax;
 	else
 		# Create our vim user configuration directory if it doesn't already exist
 		if [ ! -d $VIM_SYNTAX_PATH ] && [ -d $HOME ]; then  # Second if in case a user has no home directory, so we don't try and write to /.vim

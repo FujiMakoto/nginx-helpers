@@ -82,7 +82,7 @@ do
 	fi
 
 	# Make sure Nginx is in the PHP-FPM group (this is so Nginx can access its sockets without requiring public permissions)
-	if ! ( id -Gn "${DEFAULT_NGINX_USER}" | grep '\b${FPM_USER}\b' &>/dev/null ); then
+	if ! ( id -Gn "${DEFAULT_NGINX_USER}" | grep "\\b${FPM_USER}\\b" &>/dev/null ); then
 		if ! ( gpasswd -a "${DEFAULT_NGINX_USER}" "${FPM_USER}" ); then
 			echo -e "\e[91mFailed to add PHP-FPM group ${BOLD}${FPM_USER}${NORMAL} to Nginx user ${BOLD}${DEFAULT_NGINX_USER}${NORMAL}\e[0m";
 			exit 1;
@@ -104,15 +104,15 @@ Would you like to reset these permissions before continuing? [y/N] " -n 1 -r;
 	echo;
 fi
 
-echo;
 # Unix permissions
 if [[ $REPLY =~ ^[Yy]$ ]]; then
 	setfacl -R -b "${APP_BASEDIR}";
 	setfacl -R -d -b "${APP_BASEDIR}";
-	echo "Existing ACL permissions reset"
+	echo;
+	echo "Existing ACL permissions reset";
 fi
 echo "Making sure all files and directories are owned by ${BOLD}${WEBAPP_USER}${NORMAL}";
-chown -R "${WEBAPP_USER}" "${APP_BASEDIR}";
+chown -R "${WEBAPP_USER}": "${APP_BASEDIR}";
 echo "Setting directory permissions to ${BOLD}0750${NORMAL}";
 find "${APP_BASEDIR}" -type d -exec chmod 0750 "{}" \;
 echo "Setting file permissions to ${BOLD}0640${NORMAL}";

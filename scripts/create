@@ -55,19 +55,14 @@ mkdir "${APP_BASEDIR}";
 # Logging
 LOGS_PATH="${APP_BASEDIR}/logs";
 mkdir "${LOGS_PATH}";
-echo "Log directory created: ${LOGS_PATH}";
-
 touch "${LOGS_PATH}/access.log.gz" "${LOGS_PATH}/error.log" "${LOGS_PATH}/php_error.log" "${LOGS_PATH}/php_slow.log";
-echo "Default logfiles generated";
 
 # Web paths
 PRIVATE_PATH="${APP_BASEDIR}/internal";
 mkdir "${PRIVATE_PATH}";
-echo "Private web data path created: ${BOLD}${PRIVATE_PATH}${NORMAL}";
 
 PUBLIC_PATH="${APP_BASEDIR}/html";
 mkdir "${PUBLIC_PATH}";
-echo "Public web data path created: ${BOLD}${PUBLIC_PATH}${NORMAL}";
 
 echo;
 echo "------------------------------";

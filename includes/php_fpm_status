@@ -10,7 +10,7 @@
 # For more information, refer to the following article (since there's seemingly no official documentation)
 # https://easyengine.io/tutorials/php/fpm-status-page/
 
-location ^~ /php_fpm_status {
+location = /php_fpm_status {
     include /etc/nginx/includes/allow_only_admins;
 
     include         /etc/nginx/includes/fastcgi_params;

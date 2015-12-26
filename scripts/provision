@@ -6,7 +6,7 @@ set -u;
 
 # Resource URL's
 readonly RES_URL_VIM_SYNTAX="http://resources.makoto.io/nginx/nginx.vim";
-readonly RES_URL_INCLUDES="http://resources.makoto.io/nginx/includes.tar.gz";
+readonly RES_URL_INCLUDES="https://github.com/FujiMakoto/nginx-helpers/releases/download/v0.1/scripts.tar.gz";
 readonly RES_URL_INCLUDES_SIG="${RES_URL_INCLUDES}.asc"
 
 readonly NGINX_BASEDIR="/etc/nginx";

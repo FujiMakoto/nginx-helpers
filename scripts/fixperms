@@ -147,21 +147,22 @@ setfacl -R -d -m "u::rwx" -m "g::r-x" -m "o::-" "${APP_BASEDIR}"
 
 ## Nginx
 echo "Granting Nginx user read-only access to all files and directories";
-setfacl -R -m "u:${DEFAULT_NGINX_USER}:r-x" "${APP_BASEDIR}";
+setfacl -R -m "u:${DEFAULT_NGINX_USER}:r--" "${APP_BASEDIR}";
 setfacl -R -d -m "u:${DEFAULT_NGINX_USER}:r-x" "${APP_BASEDIR}";
 
 ## PHP-FPM
 echo "Granting PHP-FPM user read-only access to all files and directories";
-setfacl -R -m "u:${FPM_USER}:r-x" "${APP_BASEDIR}";
+setfacl -R -m "u:${FPM_USER}:r--" "${APP_BASEDIR}";
 setfacl -R -d -m "u:${FPM_USER}:r-x" "${APP_BASEDIR}";
 
 for spath in "${WRITABLE_SINGLES[@]}"
 do
 	:
 	echo "Granting PHP-FPM user write access to ${BOLD}${spath}${NORMAL}";
-	setfacl -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${fpath}";
 	if [ -d "${spath}" ]; then
 		setfacl -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${fpath}";
+	else
+		setfacl -m "u:${FPM_USER}:rw-" "${APP_BASEDIR}/html/${fpath}";
 	fi
 done
 
@@ -179,7 +180,7 @@ NGINX_LOGFILES=( "access.log.gz" "error.log" );
 for nlp in "${NGINX_LOGFILES[@]}"
 do
 	:
-	setfacl -m "u:${DEFAULT_NGINX_USER}:rwx" "${APP_BASEDIR}/logs/${nlp}";
+	setfacl -m "u:${DEFAULT_NGINX_USER}:rw-" "${APP_BASEDIR}/logs/${nlp}";
 done
 
 echo "Adjusting PHP-FPM logfile permissions";
@@ -187,7 +188,7 @@ PHP_LOGFILES=( "php_error.log" "php_slow.log" );
 for plp in "${PHP_LOGFILES[@]}"
 do
 	:
-	setfacl -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/logs/${plp}";
+	setfacl -m "u:${FPM_USER}:rw-" "${APP_BASEDIR}/logs/${plp}";
 done
 
 

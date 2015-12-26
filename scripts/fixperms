@@ -29,6 +29,13 @@ if [ ! -d $APP_BASEDIR ]; then
 	exit 1;
 fi
 
+# Make sure acl utilities have been installed
+ACL_INSTALLED=$(type setfacl &>/dev/null && echo 1 || echo 0);
+if [ $ACL_INSTALLED -lt 1 ]; then
+	echo -e "\e[93mERROR: No acl utilities present, please install the ${BOLD}acl${NORMAL}\e[93m package before running this script\e[0m";
+	exit 1;
+fi
+
 # Prompt for users and offer to create them now if they don't exist
 while true
 do
@@ -88,9 +95,9 @@ read -e -p "${BOLD}Which directories should PHP be granted recursive write acces
 
 # If ACL permissions have already been set, prompt the user to reset before continuing
 APP_BASEDIR_MODE=($(ls -ld "${APP_BASEDIR}"));
-if [ "${APP_BASEDIR_MODE[0]: -1}" = 'x' ]; then
+if [ "${APP_BASEDIR_MODE[0]: -1}" == '+' ]; then
 	read -p "This application directory appears to already have ACL permissions applied.
-	Would you like to reset these permissions before continuing? [y/N] " -n 1 -r;
+Would you like to reset these permissions before continuing? [y/N] " -n 1 -r;
 	echo;
 fi
 
@@ -101,8 +108,8 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 	setfacl -R -d -b "${APP_BASEDIR}";
 	echo "Existing ACL permissions reset"
 fi
-echo "Making sure all files and directories are owned by ${BOLD}${USER_GROUP}${NORMAL}";
-chown -R "${USER_GROUP}" "${APP_BASEDIR}";
+echo "Making sure all files and directories are owned by ${BOLD}${WEBAPP_USER}${NORMAL}";
+chown -R "${WEBAPP_USER}" "${APP_BASEDIR}";
 echo "Setting directory permissions to ${BOLD}0750${NORMAL}";
 find "${APP_BASEDIR}" -type d -exec chmod 0750 "{}" \;
 echo "Setting file permissions to ${BOLD}0640${NORMAL}";
@@ -126,18 +133,18 @@ for spath in "${WRITABLE_SINGLES[@]}"
 do
 	:
 	echo "Granting PHP-FPM user write access to ${BOLD}${spath}${NORMAL}";
-	setfacl -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/public/${fpath}";
+	setfacl -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${fpath}";
 	if [ -d "${spath}" ]; then
-		setfacl -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/public/${fpath}";
+		setfacl -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${fpath}";
 	fi
 done
 
 for rpath in "${WRITABLE_RECURSIVES[@]}"
 do
 	:
-	echo "Granting PHP-FPM user recursive write access in ${BOLD}${dpath}${NORMAL}";
-	setfacl -R -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/public/${dpath}";
-	setfacl -R -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/public/${dpath}";
+	echo "Granting PHP-FPM user recursive write access in ${BOLD}${rpath}${NORMAL}";
+	setfacl -R -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${rpath}";
+	setfacl -R -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${rpath}";
 done
 
 # Logfiles

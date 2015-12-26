@@ -79,7 +79,10 @@ do
 			echo -e "\e[91mFailed to create user ${BOLD}${FPM_USER}${NORMAL}\e[0m";
 			exit 1;
 		fi
+	fi
 
+	# Make sure Nginx is in the PHP-FPM group (this is so Nginx can access its sockets without requiring public permissions)
+	if ! ( id -Gn "${DEFAULT_NGINX_USER}" | grep '\b${FPM_USER}\b' &>/dev/null ); then
 		if ! ( gpasswd -a "${DEFAULT_NGINX_USER}" "${FPM_USER}" ); then
 			echo -e "\e[91mFailed to add PHP-FPM group ${BOLD}${FPM_USER}${NORMAL} to Nginx user ${BOLD}${DEFAULT_NGINX_USER}${NORMAL}\e[0m";
 			exit 1;

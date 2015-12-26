@@ -23,7 +23,7 @@ if ! [ $(id -u) = 0 ]; then
 fi
 
 # Make sure Nginx has been installed
-NGINX_INSTALLED=$(type nginx >/dev/null && echo 1 || echo 0);
+NGINX_INSTALLED=$(type nginx &>/dev/null && echo 1 || echo 0);
 if [ $NGINX_INSTALLED -lt 1 ] || [ ! -w $NGINX_BASEDIR ]; then
 	echo -e "\e[91mERROR: No Nginx installation present, please install Nginx before running this script\e[0m";
 fi

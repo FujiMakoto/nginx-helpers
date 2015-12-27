@@ -13,6 +13,6 @@
 location = /php_fpm_status {
     include /etc/nginx/includes/allow_only_admins;
 
-    include         /etc/nginx/includes/fastcgi_params;
+    include         /etc/nginx/includes/php_fastcgi_params;
     fastcgi_pass    php_backend;
 }

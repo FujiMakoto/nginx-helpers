@@ -10,7 +10,3 @@ location ~ ^/uploads/.*\.(?:php\d*|phtml)$ {
 location ~ ^/datastore/.*\.(?:php\d*|phtml)$ {
     deny    all;
 }
-
-location ~ ^/uploads/.*\.(?:php\d*|phtml)$ {
-    deny    all;
-}

@@ -143,16 +143,16 @@ find "${APP_BASEDIR}" -type f -exec chmod 0640 "{}" \;
 
 # ACL permissions
 echo "Setting default permissions for new files";
-setfacl -R -d -m "u::rwx" -m "g::r-x" -m "o::-" "${APP_BASEDIR}"
+#setfacl -R -d -m "u::rwx" -m "g::r-x" -m "o::-" "${APP_BASEDIR}"
 
 ## Nginx
 echo "Granting Nginx user read-only access to all files and directories";
-setfacl -R -m "u:${DEFAULT_NGINX_USER}:r--" "${APP_BASEDIR}";
+setfacl -R -m "u:${DEFAULT_NGINX_USER}:r-x" "${APP_BASEDIR}";
 setfacl -R -d -m "u:${DEFAULT_NGINX_USER}:r-x" "${APP_BASEDIR}";
 
 ## PHP-FPM
 echo "Granting PHP-FPM user read-only access to all files and directories";
-setfacl -R -m "u:${FPM_USER}:r--" "${APP_BASEDIR}";
+setfacl -R -m "u:${FPM_USER}:r-x" "${APP_BASEDIR}";
 setfacl -R -d -m "u:${FPM_USER}:r-x" "${APP_BASEDIR}";
 
 for spath in "${WRITABLE_SINGLES[@]}"
@@ -160,9 +160,9 @@ do
 	:
 	echo "Granting PHP-FPM user write access to ${BOLD}${spath}${NORMAL}";
 	if [ -d "${spath}" ]; then
-		setfacl -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${fpath}";
+		setfacl -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${spath}";
 	else
-		setfacl -m "u:${FPM_USER}:rw-" "${APP_BASEDIR}/html/${fpath}";
+		setfacl -m "u:${FPM_USER}:rw-" "${APP_BASEDIR}/html/${spath}";
 	fi
 done
 
@@ -170,7 +170,7 @@ for rpath in "${WRITABLE_RECURSIVES[@]}"
 do
 	:
 	echo "Granting PHP-FPM user recursive write access in ${BOLD}${rpath}${NORMAL}";
-	setfacl -R -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${rpath}";
+	setfacl -R -m "u:${FPM_USER}:rw-" "${APP_BASEDIR}/html/${rpath}";
 	setfacl -R -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${rpath}";
 done
 

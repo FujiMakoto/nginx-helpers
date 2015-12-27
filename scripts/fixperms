@@ -130,30 +130,30 @@ fi
 # Unix permissions
 if [[ $REPLY =~ ^[Yy]$ ]]; then
 	setfacl -R -b "${APP_BASEDIR}";
-	setfacl -R -d -b "${APP_BASEDIR}";
-	echo;
+	setfacl -Rd -b "${APP_BASEDIR}";
 	echo "Existing ACL permissions reset";
 fi
+echo;
 echo "Making sure all files and directories are owned by ${BOLD}${WEBAPP_USER}${NORMAL}";
 chown -R "${WEBAPP_USER}": "${APP_BASEDIR}";
-echo "Setting directory permissions to ${BOLD}0750${NORMAL}";
+echo "Setting directory permission masks to ${BOLD}0750${NORMAL}";
 find "${APP_BASEDIR}" -type d -exec chmod 0750 "{}" \;
-echo "Setting file permissions to ${BOLD}0640${NORMAL}";
+echo "Setting file permission masks to ${BOLD}0640${NORMAL}";
 find "${APP_BASEDIR}" -type f -exec chmod 0640 "{}" \;
 
 # ACL permissions
 echo "Setting default permissions for new files";
-#setfacl -R -d -m "u::rwx" -m "g::r-x" -m "o::-" "${APP_BASEDIR}"
+setfacl -Rd -m "u::rwX" -m "g::r-X" -m "o::-" "${APP_BASEDIR}"
 
 ## Nginx
 echo "Granting Nginx user read-only access to all files and directories";
-setfacl -R -m "u:${DEFAULT_NGINX_USER}:r-x" "${APP_BASEDIR}";
-setfacl -R -d -m "u:${DEFAULT_NGINX_USER}:r-x" "${APP_BASEDIR}";
+setfacl -R -m "u:${DEFAULT_NGINX_USER}:r-X" "${APP_BASEDIR}";
+setfacl -Rd -m "u:${DEFAULT_NGINX_USER}:r-X" "${APP_BASEDIR}";
 
-## PHP-FPM
+# ## PHP-FPM
 echo "Granting PHP-FPM user read-only access to all files and directories";
-setfacl -R -m "u:${FPM_USER}:r-x" "${APP_BASEDIR}";
-setfacl -R -d -m "u:${FPM_USER}:r-x" "${APP_BASEDIR}";
+setfacl -R -m "u:${FPM_USER}:r-X" "${APP_BASEDIR}";
+setfacl -Rd -m "u:${FPM_USER}:r-X" "${APP_BASEDIR}";
 
 for spath in "${WRITABLE_SINGLES[@]}"
 do
@@ -170,8 +170,8 @@ for rpath in "${WRITABLE_RECURSIVES[@]}"
 do
 	:
 	echo "Granting PHP-FPM user recursive write access in ${BOLD}${rpath}${NORMAL}";
-	setfacl -R -m "u:${FPM_USER}:rw-" "${APP_BASEDIR}/html/${rpath}";
-	setfacl -R -d -m "u:${FPM_USER}:rwx" "${APP_BASEDIR}/html/${rpath}";
+	setfacl -R -m "u:${FPM_USER}:rwX" "${APP_BASEDIR}/html/${rpath}";
+	setfacl -Rd -m "u:${FPM_USER}:rwX" "${APP_BASEDIR}/html/${rpath}";
 done
 
 # Logfiles

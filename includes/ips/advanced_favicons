@@ -1,0 +1,30 @@
+############################################
+# Advanced Favicons
+############################################
+# This include contains location blocks for rewrite compatibility with the Advanced Favicons third-party IPS application
+
+# General favicons
+location = /favicon.ico {
+    try_files   $uri @ips;
+}
+location ~ "^/favicon-\d{1,3}x\d{1,3}.png$" {
+    try_files   $uri @ips;
+}
+
+# Apple/Safari favicons
+location ~ "^/apple-touch-icon(?:-precomposed|-\d{1,3}x\d{1,3})?.png$" {
+    try_files   $uri @ips;
+}
+location = /safari-pinned-tab.svg {
+    try_files   $uri @ips;
+}
+
+# Microsoft/IE favicons
+location ~ "^/mstile-\d{1,3}x\d{1,3}.png$" {
+    try_files   $uri @ips;
+}
+
+# Android favicons
+location ~ "^/android-chrome-\d{1,3}x\d{1,3}.png$" {
+    try_files   $uri @ips;
+}

@@ -1,0 +1,227 @@
+#/bin/bash
+
+# apt-get build-dep nginx
+# apt-get install unzip build-essential zlib1g-dev libpcre3 libpcre3-dev git
+
+set -e
+set -u
+
+readonly SRC_ROOT="/usr/local/src/nginx"
+
+
+###############################
+# BEGIN USER CONFIGURATION    #
+###############################
+# http://nginx.org/en/download.html
+readonly NGX_VERSION="1.10.0"
+
+# https://www.openssl.org/source/
+readonly OPENSSL_VERSION="1.0.2g"
+
+# https://developers.google.com/speed/pagespeed/module/build_ngx_pagespeed_from_source#build-instructions
+readonly NPS_VERSION="1.11.33.1"
+
+# https://github.com/openresty/headers-more-nginx-module/releases
+readonly HM_VERSION="v0.30rc1"
+
+
+readonly NGX_PREFIX="/etc/nginx"
+readonly NGX_SBIN="/usr/sbin/nginx"
+readonly NGX_CONF="/etc/nginx/nginx.conf"
+readonly NGX_LOGS="/var/log/nginx"
+readonly NGX_RUN="/var/run"
+readonly NGX_CACHE="/var/cache/nginx"
+
+readonly NGX_USER="nginx"
+readonly NGX_GROUP="nginx"
+
+
+readonly CPPFLAGS="-march=native"
+###############################
+# DO NOT EDIT PAST THIS LINE  #
+###############################
+
+
+readonly BOLD=$(tput bold)
+readonly NORMAL=$(tput sgr0)
+
+readonly CONFIGURE_FLAGS="--prefix=${NGX_PREFIX}
+	--sbin-path=${NGX_SBIN}
+	--conf-path=${NGX_CONF}
+	--error-log-path=${NGX_LOGS}/error.log
+	--http-log-path=${NGX_LOGS}/access.log
+	--pid-path=${NGX_RUN}/nginx.pid
+	--lock-path=${NGX_RUN}/nginx.lock
+	--http-client-body-temp-path=${NGX_CACHE}/client_temp
+	--http-proxy-temp-path=${NGX_CACHE}/proxy_temp
+	--http-fastcgi-temp-path=${NGX_CACHE}/fastcgi_temp
+	--http-uwsgi-temp-path=${NGX_CACHE}/uwsgi_temp
+	--http-scgi-temp-path=${NGX_CACHE}/scgi_temp
+	--user=${NGX_USER}
+	--group=${NGX_GROUP}
+	--with-http_ssl_module
+	--with-http_sub_module
+	--with-http_stub_status_module
+	--with-http_mp4_module
+	--with-http_gzip_static_module
+	--with-mail
+	--with-mail_ssl_module
+	--with-file-aio
+        --with-threads
+	--with-http_v2_module
+	--with-ipv6
+	--with-cc-opt=-mtune=native
+	--add-module=${SRC_ROOT}/extensions/mod_zip
+	--add-module=${SRC_ROOT}/extensions/headers-more
+	--add-module=${SRC_ROOT}/extensions/pagespeed/ngx_pagespeed-release-${NPS_VERSION}-beta"
+
+
+###############################
+# Utility functions           #
+###############################
+http_extract() {
+	local filename="$(basename "$1")"
+	wget -O "${filename}" -q --show-progress "$1"
+	tar -xf "${filename}"
+}
+
+pre_prompt() {
+	echo
+	echo -e "Nginx version:\e[94m${BOLD}${NGX_VERSION}${NORMAL}\e[0m"
+	#echo -e "OpenSSL version:\e[94m${BOLD}${OPENSSL_VERSION}${NORMAL}\e[0m"
+	echo -e "PageSpeed version:\e[94m${BOLD}${NPS_VERSION}${NORMAL}\e[0m"
+	echo
+	echo -e "\e[94m${BOLD}Build configuration:${NORMAL}\e[0m"
+	echo "${CONFIGURE_FLAGS}"
+	echo
+	echo -e "${BOLD}Build starting in 10 seconds, press CTRL+C to abort now${NORMAL}"
+	echo "------------------------------"
+	echo
+	sleep 10
+}
+
+install_prompt() {
+	echo
+	echo -e "Build complete"
+	echo -e "${BOLD}${SRC_ROOT}/source/nginx-${NGX_VERSION}${NORMAL}"
+	echo
+	read -p "Would you like to install now? [y/N] " -n 1 -r
+
+	if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+		echo "Have a nice day"
+		exit
+	fi
+}
+
+
+###############################
+# Download functions          #
+###############################
+download_openssl() {
+	# Init
+	local openssl_download_url="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
+	local openssl_src_root="${SRC_ROOT}/deps/openssl"
+	mkdir -p "${openssl_src_root}"
+
+	# Have we already downloaded this version?
+	if [ -d "${openssl_src_root}/openssl-${OPENSSL_VERSION}" ]; then
+		return 0
+	fi
+
+	pushd "${openssl_src_root}" >/dev/null
+	http_extract "${openssl_download_url}"
+	popd >/dev/null
+}
+
+download_modzip() {
+	# Init
+	local modzip_git_url="https://github.com/evanmiller/mod_zip.git"
+	local modzip_src_root="${SRC_ROOT}/extensions/mod_zip"
+	mkdir -p "${SRC_ROOT}/extensions"
+
+	# Have we already downloaded this extension?
+	if [ -d "${modzip_src_root}" ]; then
+		pushd "${modzip_src_root}" >/dev/null
+		git pull
+		popd >/dev/null
+
+		return 0
+	fi
+
+	pushd "${SRC_ROOT}/extensions" >/dev/null
+	git clone "${modzip_git_url}"
+	popd >/dev/null
+}
+
+download_headersmore() {
+	# TODO: Incomplete
+	local headersmore_download_url="https://github.com/openresty/headers-more-nginx-module/archive/${HM_VERSION}.tar.gz"
+	local modzip_src_root="${SRC_ROOT}/extensions/mod_zip"
+}
+
+download_pagespeed() {
+	# Init
+	local nps_download_url="https://github.com/pagespeed/ngx_pagespeed/archive/release-${NPS_VERSION}-beta.zip"
+	local psol_download_url="https://dl.google.com/dl/page-speed/psol/${NPS_VERSION}.tar.gz"
+	local nps_src_root="${SRC_ROOT}/extensions/pagespeed"
+	mkdir -p "${nps_src_root}"
+
+	local nps_fp="${nps_src_root}/ngx_pagespeed-release-${NPS_VERSION}-beta"
+
+	# Have we already downloaded this version?
+	if [ -d "${nps_fp}" ]; then
+		return 0
+	fi
+
+	# Download ngx_pagespeed source
+	pushd "${nps_src_root}" >/dev/null
+	wget "${nps_download_url}" -O "release-${NPS_VERSION}-beta.zip" -q --show-progress
+	unzip "release-${NPS_VERSION}-beta.zip"
+	popd >/dev/null
+
+	# Download psol source
+	pushd "${nps_fp}" >/dev/null
+	wget "${psol_download_url}" -q --show-progress
+	tar -xzf "${NPS_VERSION}.tar.gz"
+	popd >/dev/null
+}
+
+
+###############################
+# Main function               #
+###############################
+main() {
+	pre_prompt
+
+	#download_openssl
+	download_pagespeed
+	download_headersmore
+	download_modzip
+
+	mkdir -p "${SRC_ROOT}/source"
+	local source_dir="${SRC_ROOT}/source/nginx-${NGX_VERSION}"
+
+	if [ ! -d "${source_dir}" ]; then
+		pushd "${SRC_ROOT}/source" >/dev/null
+
+		wget "http://nginx.org/download/nginx-${NGX_VERSION}.tar.gz" -q --show-progress
+		tar -xzf "nginx-${NGX_VERSION}.tar.gz"
+
+		popd >/dev/null
+	fi;
+
+	cd "${source_dir}"
+
+	export CPPFLAGS
+	./configure ${CONFIGURE_FLAGS}
+	make -j9
+
+	install_prompt
+
+	echo
+	su -c 'make install'
+	echo
+	echo -e "\e[92m${BOLD}Install complete. Have a nice day${NORMAL}\e[0m"
+}
+
+main
